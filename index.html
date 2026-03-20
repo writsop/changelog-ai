@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChangelogAI - Turn Git Commits into Beautiful Changelogs</title>
+<meta name="description" content="AI-powered changelog generator. Paste your git commits, get a beautiful user-facing changelog in seconds.">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0a;--surface:#141414;--border:#2a2a2a;--text:#e5e5e5;--muted:#888;--accent:#6366f1;--accent2:#818cf8;--green:#22c55e;--orange:#f59e0b;--red:#ef4444}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);line-height:1.6;min-height:100vh}
+.container{max-width:900px;margin:0 auto;padding:20px}
+header{text-align:center;padding:40px 0 30px}
+h1{font-size:2.5rem;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.tagline{color:var(--muted);font-size:1.1rem}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:20px}
+.card h2{font-size:1.1rem;margin-bottom:16px;color:var(--accent2)}
+label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:6px;font-weight:500}
+textarea{width:100%;background:#0d0d0d;border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font-family:'SF Mono',Monaco,monospace;font-size:.85rem;resize:vertical;transition:border-color .2s}
+textarea:focus{outline:none;border-color:var(--accent)}
+input[type=password],select{width:100%;background:#0d0d0d;border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:.9rem}
+input:focus,select:focus{outline:none;border-color:var(--accent)}
+.row{display:flex;gap:12px;margin-bottom:12px}
+.row>div{flex:1}
+.btn{background:linear-gradient(135deg,var(--accent),#4f46e5);color:#fff;border:none;padding:14px 28px;border-radius:8px;font-size:1rem;font-weight:600;cursor:pointer;width:100%;transition:opacity .2s}
+.btn:hover{opacity:.9}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-secondary{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:10px 20px;font-size:.85rem;width:auto}
+.output{display:none}
+.output.show{display:block}
+#result{white-space:pre-wrap;font-size:.9rem;line-height:1.8}
+#result h3{color:var(--accent2);margin:16px 0 8px;font-size:1rem}
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.75rem;font-weight:600;margin-right:6px}
+.tag-feature{background:rgba(34,197,94,.15);color:var(--green)}
+.tag-fix{background:rgba(239,68,68,.15);color:var(--red)}
+.tag-improve{background:rgba(245,158,11,.15);color:var(--orange)}
+.loading{display:none;text-align:center;padding:30px}
+.loading.show{display:block}
+.spinner{display:inline-block;width:24px;height:24px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.actions{display:flex;gap:8px;margin-top:16px}
+.stats{display:flex;gap:20px;justify-content:center;margin:20px 0;flex-wrap:wrap}
+.stat{text-align:center;padding:12px 20px;background:var(--surface);border-radius:8px;border:1px solid var(--border)}
+.stat-num{font-size:1.5rem;font-weight:700;color:var(--accent2)}
+.stat-label{font-size:.75rem;color:var(--muted)}
+footer{text-align:center;padding:40px 0;color:var(--muted);font-size:.8rem}
+.example-btn{background:none;border:1px dashed var(--border);color:var(--muted);padding:8px 16px;border-radius:6px;cursor:pointer;font-size:.8rem;margin-top:8px}
+.example-btn:hover{border-color:var(--accent);color:var(--accent)}
+.note{font-size:.78rem;color:var(--muted);margin-top:6px}
+.format-tabs{display:flex;gap:0;margin-bottom:12px;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.format-tab{flex:1;padding:8px;text-align:center;background:var(--surface);border:none;color:var(--muted);cursor:pointer;font-size:.85rem}
+.format-tab.active{background:var(--accent);color:#fff}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<h1>⚡ ChangelogAI</h1>
+<p class="tagline">Turn git commits into beautiful, user-facing changelogs in seconds</p>
+</header>
+
+<div class="card">
+<h2>📋 Paste Your Git Commits</h2>
+<textarea id="commits" rows="10" placeholder="Paste your git log output here...
+
+Example:
+feat: add dark mode toggle to settings page
+fix: resolve memory leak in WebSocket handler  
+chore: update dependencies to latest versions
+feat(auth): implement OAuth2 with Google
+fix(api): handle null response from payment gateway
+refactor: extract shared validation logic
+perf: optimize image lazy loading
+docs: update API reference for v2 endpoints"></textarea>
+<button class="example-btn" onclick="loadExample()">📝 Load example commits</button>
+</div>
+
+<div class="card">
+<h2>🔑 API Settings</h2>
+<div class="row">
+<div>
+<label>OpenAI API Key</label>
+<input type="password" id="apiKey" placeholder="sk-...">
+<p class="note">Your key stays in your browser. Never sent to any server.</p>
+</div>
+<div>
+<label>Model</label>
+<select id="model">
+<option value="gpt-4o-mini">GPT-4o Mini (fast, cheap)</option>
+<option value="gpt-4o">GPT-4o (best quality)</option>
+<option value="gpt-3.5-turbo">GPT-3.5 Turbo (fastest)</option>
+</select>
+</div>
+</div>
+<div class="row">
+<div>
+<label>Product Name (optional)</label>
+<input type="password" id="productName" placeholder="MyApp" style="-webkit-text-security:none">
+</div>
+<div>
+<label>Tone</label>
+<select id="tone">
+<option value="professional">Professional</option>
+<option value="casual">Casual & Friendly</option>
+<option value="technical">Technical</option>
+<option value="marketing">Marketing-focused</option>
+</select>
+</div>
+</div>
+</div>
+
+<button class="btn" id="generateBtn" onclick="generate()">✨ Generate Changelog</button>
+
+<div class="loading" id="loading">
+<div class="spinner"></div>
+<p style="margin-top:12px;color:var(--muted)">AI is analyzing your commits...</p>
+</div>
+
+<div class="output" id="outputCard">
+<div class="card">
+<h2>📄 Your Changelog</h2>
+<div class="format-tabs">
+<button class="format-tab active" onclick="switchFormat('rendered')" id="tab-rendered">Rendered</button>
+<button class="format-tab" onclick="switchFormat('markdown')" id="tab-markdown">Markdown</button>
+</div>
+<div id="rendered-output"></div>
+<textarea id="markdown-output" rows="15" style="display:none" readonly></textarea>
+<div class="actions">
+<button class="btn-secondary" onclick="copyChangelog()">📋 Copy Markdown</button>
+<button class="btn-secondary" onclick="downloadChangelog()">💾 Download .md</button>
+</div>
+</div>
+</div>
+
+<footer>
+<p>Built by <a href="https://github.com/writsop" style="color:var(--accent)">X-Money</a> · Your API key never leaves your browser · 100% client-side</p>
+</footer>
+</div>
+
+<script>
+let lastMarkdown = '';
+
+const EXAMPLE = `feat: add dark mode toggle to settings page
+feat(auth): implement OAuth2 login with Google and GitHub
+feat: add export to CSV for analytics dashboard
+fix: resolve memory leak in WebSocket connection handler
+fix(api): handle null response from payment gateway
+fix: correct timezone offset in scheduled reports
+chore: update React to v19, migrate deprecated APIs
+chore: upgrade Node.js from 18 to 22 LTS
+perf: optimize image lazy loading, reduce LCP by 40%
+perf: implement virtual scrolling for large data tables
+refactor: extract shared form validation into hooks
+docs: update API reference for v2 endpoints
+style: redesign onboarding flow with new brand colors`;
+
+function loadExample() {
+  document.getElementById('commits').value = EXAMPLE;
+}
+
+async function generate() {
+  const commits = document.getElementById('commits').value.trim();
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const model = document.getElementById('model').value;
+  const product = document.getElementById('productName').value.trim() || 'the product';
+  const tone = document.getElementById('tone').value;
+  
+  if (!commits) { alert('Please paste your git commits'); return; }
+  if (!apiKey) { alert('Please enter your OpenAI API key'); return; }
+  
+  const btn = document.getElementById('generateBtn');
+  const loading = document.getElementById('loading');
+  const output = document.getElementById('outputCard');
+  
+  btn.disabled = true;
+  loading.classList.add('show');
+  output.classList.remove('show');
+  
+  const toneGuide = {
+    professional: 'Use a professional, clear tone suitable for a company blog.',
+    casual: 'Use a casual, friendly tone with occasional emoji. Make it feel human and approachable.',
+    technical: 'Use a technical tone. Include relevant technical details developers would appreciate.',
+    marketing: 'Use an upbeat marketing tone. Emphasize benefits to users, not technical details.'
+  };
+  
+  const prompt = `You are a changelog writer. Given these git commits, create a beautiful, user-facing changelog.
+
+Product name: ${product}
+Tone: ${toneGuide[tone]}
+
+Rules:
+- Group into categories: ✨ New Features, 🐛 Bug Fixes, ⚡ Improvements, 🔧 Maintenance
+- Only include categories that have entries
+- Rewrite each commit as a user-friendly bullet point
+- Remove technical jargon unless tone is technical
+- Each bullet should explain the BENEFIT to the user
+- Output clean Markdown
+- Start with a brief 1-2 sentence summary of this release
+- Do NOT include commit hashes or author names
+
+Git commits:
+${commits}`;
+
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.7, max_tokens: 2000 })
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'API request failed');
+    }
+    
+    const data = await res.json();
+    lastMarkdown = data.choices[0].message.content;
+    
+    document.getElementById('markdown-output').value = lastMarkdown;
+    document.getElementById('rendered-output').innerHTML = renderMarkdown(lastMarkdown);
+    
+    output.classList.add('show');
+    switchFormat('rendered');
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    loading.classList.remove('show');
+  }
+}
+
+function renderMarkdown(md) {
+  return md
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h3 style="font-size:1.15rem;margin-top:20px">$1</h3>')
+    .replace(/^# (.+)$/gm, '<h3 style="font-size:1.3rem">$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^- (.+)$/gm, '<div style="padding:4px 0 4px 16px">• $1</div>')
+    .replace(/\n\n/g, '<br>')
+    .replace(/\n/g, '\n');
+}
+
+function switchFormat(fmt) {
+  document.getElementById('rendered-output').style.display = fmt === 'rendered' ? 'block' : 'none';
+  document.getElementById('markdown-output').style.display = fmt === 'markdown' ? 'block' : 'none';
+  document.querySelectorAll('.format-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + fmt).classList.add('active');
+}
+
+function copyChangelog() {
+  navigator.clipboard.writeText(lastMarkdown).then(() => {
+    const btn = event.target;
+    btn.textContent = '✅ Copied!';
+    setTimeout(() => btn.textContent = '📋 Copy Markdown', 2000);
+  });
+}
+
+function downloadChangelog() {
+  const blob = new Blob([lastMarkdown], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'CHANGELOG.md'; a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
